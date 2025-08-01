@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SecureVault - Password & Notes</title>
+  <style>
+    :root {
+      --bg: #030e12;
+      --primary: #5bcc6e;
+      --accent: #fcde67;
+      --text: #ffffff;
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    h2 {
+      text-align: center;
+      color: var(--primary);
+    }
+
+    input, textarea, button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid #555;
+      border-radius: 6px;
+      font-size: 16px;
+      background: #1a1a1a;
+      color: var(--text);
+      box-sizing: border-box;
+    }
+
+    button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background-color: var(--accent);
+      color: #000;
+    }
+
+    .strength-bar {
+      height: 10px;
+      background: #444;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      transition: 0.3s;
+    }
+
+    .note, .password-saved {
+      background: rgba(255,255,255,0.05);
+      padding: 10px;
+      border-radius: 6px;
+      margin: 10px 0;
+    }
+
+    .note button, .password-saved button {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      float: right;
+      margin-left: 10px;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .note button:hover, .password-saved button:hover {
+      background-color: var(--primary);
+      color: #fff;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 15px;
+      }
+
+      input, textarea, button {
+        font-size: 14px;
+        padding: 10px;
+      }
+
+      .note button, .password-saved button {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>SecureVault</h2>
+    <input type="password" id="password" placeholder="Enter password" />
+    <div class="strength-bar"><div id="barFill" class="bar-fill"></div></div>
+    <p id="strengthLabel"></p>
+    <div id="suggestions"></div>
+    <button onclick="savePassword()">Save Password</button>
+    <div id="savedPasswordBox" class="password-saved" style="display:none">
+      <span id="maskedPassword"></span>
+      <button onclick="togglePassword()">Show</button>
+      <button onclick="deletePassword()">Delete</button>
+    </div>
+    <hr />
+    <textarea id="noteInput" placeholder="Write a note..."></textarea>
+    <button onclick="saveNote()">Save Note</button>
+    <div id="notesContainer"></div>
+  </div>
+  <script>
+    const passwordInput = document.getElementById("password");
+    const barFill = document.getElementById("barFill");
+    const strengthLabel = document.getElementById("strengthLabel");
+    const suggestionsDiv = document.getElementById("suggestions");
+    const maskedPassword = document.getElementById("maskedPassword");
+    const savedPasswordBox = document.getElementById("savedPasswordBox");
+    let showPassword = false;
+
+    passwordInput.addEventListener("input", () => {
+      const pwd = passwordInput.value;
+      let score = 0;
+      let suggestions = [];
+      if (pwd.length >= 8) score++; else suggestions.push("Use 8+ characters");
+      if (/[A-Z]/.test(pwd)) score++; else suggestions.push("Add uppercase letter");
+      if (/[a-z]/.test(pwd)) score++; else suggestions.push("Add lowercase letter");
+      if (/[0-9]/.test(pwd)) score++; else suggestions.push("Add number");
+      if (/[^A-Za-z0-9]/.test(pwd)) score++; else suggestions.push("Add special character");
+
+      const colors = ["#e74c3c", "#f39c12", "#f1c40f", "#2ecc71", "#27ae60"];
+      const labels = ["Very Weak", "Weak", "Medium", "Strong", "Very Strong"];
+
+      barFill.style.width = (score * 20) + "%";
+      barFill.style.backgroundColor = colors[score - 1] || "#ccc";
+      strengthLabel.textContent = "Strength: " + (labels[score - 1] || "Too Short");
+      suggestionsDiv.textContent = suggestions.join(", ");
+    });
+
+    function savePassword() {
+      const pwd = passwordInput.value;
+      if (!pwd) return alert("Enter a password.");
+      localStorage.setItem("savedPassword", pwd);
+      updateSavedPassword();
+    }
+
+    function updateSavedPassword() {
+      const pwd = localStorage.getItem("savedPassword");
+      if (pwd) {
+        savedPasswordBox.style.display = "block";
+        maskedPassword.textContent = showPassword ? pwd : "*".repeat(pwd.length);
+      } else {
+        savedPasswordBox.style.display = "none";
+      }
+    }
+
+    function togglePassword() {
+      showPassword = !showPassword;
+      updateSavedPassword();
+    }
+
+    function deletePassword() {
+      localStorage.removeItem("savedPassword");
+      updateSavedPassword();
+    }
+
+    function saveNote() {
+      const note = document.getElementById("noteInput").value.trim();
+      if (!note) return;
+      const notes = JSON.parse(localStorage.getItem("notes")) || [];
+      notes.push(note);
+      localStorage.setItem("notes", JSON.stringify(notes));
+      document.getElementById("noteInput").value = "";
+      loadNotes();
+    }
+
+    function loadNotes() {
+      const notes = JSON.parse(localStorage.getItem("notes")) || [];
+      const container = document.getElementById("notesContainer");
+      container.innerHTML = "";
+      notes.forEach((note, index) => {
+        container.innerHTML += `<div class="note">${note}<button onclick="deleteNote(${index})">Delete</button></div>`;
+      });
+    }
+
+    function deleteNote(index) {
+      const notes = JSON.parse(localStorage.getItem("notes")) || [];
+      notes.splice(index, 1);
+      localStorage.setItem("notes", JSON.stringify(notes));
+      loadNotes();
+    }
+
+    updateSavedPassword();
+    loadNotes();
+  </script>
+</body>
+</html>
